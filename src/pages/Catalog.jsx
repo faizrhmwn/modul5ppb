@@ -7,55 +7,36 @@ import GunDetail from '../components/gun/GunDetail'
 import AdvancedFilter from '../components/common/AdvancedFilter'
 import ConfirmModal from '../components/modals/ConfirmModal'
 import gunService from '../services/gunService'
-import {
-  matchesSearch,
-  matchesCategory,
-  sortItems,
-  extractCategories,
-} from '../utils/helpers'
+import { matchesSearch, matchesCategory, sortItems, extractCategories } from '../utils/helpers'
 
-/**
- * Catalog page — the main product listing.
- *
- * Data source priority:
- *   1. Live API via useGuns()
- *   2. Local static array (GUNS_LOCAL) when the API is unreachable
- *
- * Features: search, category filter, sort, CRUD actions, detail modal.
- */
 export default function Catalog({ onNavigate }) {
-  // ---- API data ----
-  const { guns: apiGuns, loading, error, refetch } = useGuns({ limit: 50 })
+  // State Paginasi
+  const [page, setPage] = useState(1)
+  const limit = 3 // 3 produk per halaman agar paginasi terlihat jelas dengan 6 data awal
+
+  const { guns: apiGuns, loading, error, refetch } = useGuns({ limit: limit, page: page })
   const [useLocal, setUseLocal] = useState(false)
 
-  // Decide data source
   const rawGuns = useMemo(() => {
     if (useLocal || (error && apiGuns.length === 0)) {
-      // Enrich local data with synthetic ids so FavoriteButton and detail work
       return GUNS_LOCAL.map((g, i) => ({ ...g, id: g.id || `local-${i}` }))
     }
     return apiGuns
   }, [apiGuns, error, useLocal])
 
-  // ---- filters / sort ----
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
   const [sortKey, setSortKey] = useState('name')
   const [sortOrder, setSortOrder] = useState('asc')
-
+  
   const categories = useMemo(() => extractCategories(rawGuns), [rawGuns])
-
+  
   const filteredGuns = useMemo(() => {
-    let result = rawGuns.filter(
-      (g) => matchesSearch(g, search) && matchesCategory(g, activeCategory),
-    )
+    let result = rawGuns.filter((g) => matchesSearch(g, search) && matchesCategory(g, activeCategory))
     return sortItems(result, sortKey, sortOrder)
   }, [rawGuns, search, activeCategory, sortKey, sortOrder])
 
-  // ---- detail view ----
   const [selectedGun, setSelectedGun] = useState(null)
-
-  // ---- delete ----
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -75,7 +56,6 @@ export default function Catalog({ onNavigate }) {
     }
   }
 
-  // ---- If viewing a single product detail ----
   if (selectedGun) {
     return (
       <GunDetail
@@ -87,7 +67,6 @@ export default function Catalog({ onNavigate }) {
     )
   }
 
-  // ---- Main catalog view ----
   return (
     <>
       <section className="masthead">
@@ -97,7 +76,7 @@ export default function Catalog({ onNavigate }) {
           with its type, caliber, and price — nothing else.
         </p>
       </section>
-
+      
       <section>
         <div className="list-head">
           <h2>Current stock</h2>
@@ -106,18 +85,13 @@ export default function Catalog({ onNavigate }) {
               {filteredGuns.length} piece{filteredGuns.length !== 1 ? 's' : ''}
             </span>
             {onNavigate && (
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => onNavigate('Create')}
-              >
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => onNavigate('Create')}>
                 <Plus size={16} /> Add
               </button>
             )}
           </div>
         </div>
 
-        {/* Filters */}
         <AdvancedFilter
           search={search}
           onSearch={setSearch}
@@ -129,7 +103,6 @@ export default function Catalog({ onNavigate }) {
           onSort={({ key, order }) => { setSortKey(key); setSortOrder(order) }}
         />
 
-        {/* States */}
         {loading && (
           <div className="state-box">
             <Loader size={28} className="spin" />
@@ -145,11 +118,7 @@ export default function Catalog({ onNavigate }) {
               <button type="button" className="btn btn--outline" onClick={refetch}>
                 <RefreshCw size={16} /> Retry
               </button>
-              <button
-                type="button"
-                className="btn btn--outline"
-                onClick={() => setUseLocal(true)}
-              >
+              <button type="button" className="btn btn--outline" onClick={() => setUseLocal(true)}>
                 View Local Catalog
               </button>
             </div>
@@ -163,7 +132,6 @@ export default function Catalog({ onNavigate }) {
           </div>
         )}
 
-        {/* Product grid */}
         {filteredGuns.length > 0 && (
           <ul className="stock">
             {filteredGuns.map((gun) => (
@@ -181,18 +149,32 @@ export default function Catalog({ onNavigate }) {
         {useLocal && (
           <p className="local-notice">
             Showing local catalog (server unavailable).{' '}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => { setUseLocal(false); refetch() }}
-            >
+            <button type="button" className="link-btn" onClick={() => { setUseLocal(false); refetch() }}>
               Retry server
             </button>
           </p>
         )}
+
+        {/* Kontrol UI Paginasi */}
+        {!loading && filteredGuns.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '30px' }}>
+            <button 
+              className="btn btn--outline" 
+              disabled={page === 1} 
+              onClick={() => { setPage(p => p - 1); window.scrollTo(0,0); }}>
+              Sebelumnya
+            </button>
+            <span style={{ fontWeight: 'bold' }}>Halaman {page}</span>
+            <button 
+              className="btn btn--outline" 
+              disabled={filteredGuns.length < limit} 
+              onClick={() => { setPage(p => p + 1); window.scrollTo(0,0); }}>
+              Selanjutnya
+            </button>
+          </div>
+        )}
       </section>
 
-      {/* Delete confirmation */}
       <ConfirmModal
         open={!!deleteTarget}
         title="Delete Product"
